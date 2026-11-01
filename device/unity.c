@@ -54,6 +54,9 @@
 #if FM1B_WIFI || FM1B_BLE
 #define FL_UID 1                          /* the flash's unique ID: the WiFi MAC, the Bluetooth name (plat_chip_uid) */
 #endif
+#if defined(FELUCCA_UAC10) && FELUCCA_UAC10
+#define FL_USB_PUMP 1                     /* USB audio through a flash write */
+#endif
 #include "fm1_flash.h"
 #include "fm1_xip.h"
 #include "fm1_perf.h"
@@ -148,19 +151,32 @@ static int st_read(uint32_t off, void *dst, uint32_t n)   /* 256-byte IRQ-off wi
     }
     return 0;
 }
+#if FL_USB_PUMP
+#define FL_PUMP(on) usb_flash_pump(on)
+#else
+#define FL_PUMP(on) ((void)0)
+#endif
 static int st_erase(uint32_t off)
 {
     uint32_t took;
+    int rc;
     if (!FL_STORE_OK(off, 0x1000u))
         return -8;
     audio_silence();
-    return fl_erase4k(off, &took);
+    FL_PUMP(1);
+    rc = fl_erase4k(off, &took);
+    FL_PUMP(0);
+    return rc;
 }
 static int st_prog(uint32_t off, const void *src, uint32_t n)
 {
+    int rc;
     if (!FL_STORE_OK(off, n))
         return -8;
-    return fl_write(off, src, n);
+    FL_PUMP(1);
+    rc = fl_write(off, src, n);
+    FL_PUMP(0);
+    return rc;
 }
 #include "storage.c"
 
