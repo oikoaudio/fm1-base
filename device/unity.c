@@ -166,6 +166,10 @@ static int st_erase(uint32_t off)
     FL_PUMP(1);
     rc = fl_erase4k(off, &took);
     FL_PUMP(0);
+#if FL_USB_PUMP
+    if (took > fl_pump.erase_us)
+        fl_pump.erase_us = took;
+#endif
     return rc;
 }
 static int st_prog(uint32_t off, const void *src, uint32_t n)

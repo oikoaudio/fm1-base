@@ -146,6 +146,12 @@ static void audio_silence(void)                     /* IRQs off (flash erase): t
 static uint8_t usb_due;
 static uint32_t t5_gap_max, t5_late, t5_run_max;                /* the longest gap between ticks (us), and gaps over 300 us:
                                                      * the key and light scan held up (the log reads and clears) */
+uint32_t plat_tick_gap(void)                        /* the longest gap between ticks since the last call (us) */
+{
+    const uint32_t g = t5_gap_max;
+    t5_gap_max = 0;
+    return g;
+}
 void fm1_timer5_irq(void)
 {
     static uint32_t sub, t5_prev;
