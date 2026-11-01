@@ -177,6 +177,11 @@ void fm1_timer5_irq(void)
             uac_service();
 #endif
     }
+#if FELUCCA_UAC10
+    else if (uac_every_tick()) {
+        uac_service();                                  /* 10 CH, every tick (usb.c uac_service10): usb_poll has the rest */
+    }
+#endif
     if (usb_due && !fm1b_dbg.in_audio) {
         usb_due = 0;
         usb_poll();
