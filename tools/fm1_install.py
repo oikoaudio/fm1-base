@@ -210,6 +210,15 @@ class MidoLink:
             except Exception:
                 pass
 
+    def abandon(self):
+        """for a device about to restart. python-rtmidi keeps the GIL through close_port, which waits for the input thread, and
+        that thread needs the GIL to deliver what the device sent last: a deadlock no timeout or Ctrl+C can reach. So the
+        port stays open, and main ends the process without closing it"""
+        ABANDONED.append(self)
+
+
+ABANDONED = []
+
 
 class MidoBackend:
     def __init__(self):
@@ -230,6 +239,11 @@ class MidoBackend:
     def hello(self, skip, asking):
         """the input names that answer the screen reader's HELLO (fm1ports.ask: one round), but skip(name)'s"""
         return [f.input for f in fm1ports.ask(self.mido, skip=skip, tries=1, timeout=DELAY["hello"], asking=asking)]
+
+
+def let_go(link):
+    """a link whose device is about to restart"""
+    getattr(link, "abandon", link.close)()
 
 
 # --------------------------------------------------------------- updater ---
@@ -382,7 +396,7 @@ class Updater:
         time.sleep(DELAY["start"])
         served, finished, lost = self.serve(dev.link, image, FINISH_CHECK, DELAY["idle_check"],
                                             lambda k, end: step("check", k))
-        dev.link.close()
+        let_go(dev.link)
         if not finished:
             raise InstallError("lost" if lost else "stopped",
                                f"the FM-1 {'was disconnected' if lost else 'stopped answering'} after "
@@ -402,7 +416,7 @@ class Updater:
         time.sleep(DELAY["start"])
         served, finished, lost = self.serve(ota.link, image, FINISH_WRITE, DELAY["idle_write"],
                                             lambda k, end: step("write", min(99, end * 100 // len(image))))
-        ota.link.close()
+        let_go(ota.link)
         if not finished:
             raise InstallError("lost" if lost else "stopped",
                                f"the loader {'was disconnected' if lost else 'stopped answering'} after "
@@ -591,4 +605,7 @@ def main(argv=None, backend=None, out=sys.stdout, ask=ask_tty):
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    code = main()
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(code)      # not through the interpreter's teardown, which would close an abandoned port: MidoLink.abandon

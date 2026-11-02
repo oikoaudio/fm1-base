@@ -329,8 +329,25 @@ def against_js():
     ok(I.LOADER_MARK in raw, f"{clean.name} carries the Felucca loader marker")
 
 
+def stuck_close():
+    """python-rtmidi can deadlock in close_port as a device goes, past any timeout or Ctrl+C: those links are left open"""
+    class Port:
+        closed = 0
+        def close(self):
+            Port.closed += 1
+    link = I.MidoLink.__new__(I.MidoLink)
+    link.inp, link.out = Port(), Port()
+    I.let_go(link)
+    ok(not Port.closed and link in I.ABANDONED, "a link to a device that is restarting is not closed")
+
+
 wire()
+stuck_close()
+abandoned = []
+FakeLink.abandon = lambda self: abandoned.append(self)
 installs()
+del FakeLink.abandon
+ok(len(abandoned) >= 2, f"an install leaves both links open as the device restarts ({len(abandoned)})")
 errors()
 from_open()
 against_js()
